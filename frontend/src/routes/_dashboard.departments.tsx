@@ -46,7 +46,7 @@ function DepartmentsPage() {
     return () => clearTimeout(t);
   }, [search]);
 
-  const { data: departmentsData, isPending: isLoading } = useQuery({
+  const { data: departmentsData, isPending: isLoading } = useQuery<Department[]>({
     queryKey: ["departments", debouncedSearch],
     queryFn: () => api.get(`/departments?search=${debouncedSearch}&limit=100`).then((res) => res.data.data ?? []),
     staleTime: 5 * 60 * 1000,

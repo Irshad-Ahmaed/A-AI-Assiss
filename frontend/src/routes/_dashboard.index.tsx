@@ -11,6 +11,7 @@ import {
   Clock,
   AlertTriangle,
   TrendingUp,
+  Loader2,
 } from "lucide-react";
 import {
   ResponsiveContainer,
@@ -47,42 +48,65 @@ interface Analytics {
 function DashboardPage() {
   const [showAllUnderRunning, setShowAllUnderRunning] = useState(false);
 
-  const { data: utilisationData, isPending: utilisationPending, error: utilisationError } = useQuery({
+  const { data: utilisationData, isPending: utilisationPending, error: utilisationError } = useQuery<{
+    roomUtilisation: number;
+    perRoom: Array<{ room: string; utilisation: number }>;
+  }>({
     queryKey: ["analytics", "utilisation"],
     queryFn: () => api.get("/analytics/utilisation").then((res) => res.data),
     staleTime: 5 * 60 * 1000,
   });
 
-  const { data: probabilityData, isPending: probabilityPending, error: probabilityError } = useQuery({
+  const { data: probabilityData, isPending: probabilityPending, error: probabilityError } = useQuery<{
+    emptyProbability: Array<{ slot: string; probability: number }>;
+  }>({
     queryKey: ["analytics", "empty-probability"],
     queryFn: () => api.get("/analytics/empty-probability").then((res) => res.data),
     staleTime: 5 * 60 * 1000,
   });
 
-  const { data: underRunningData, isPending: underRunningPending, error: underRunningError } = useQuery({
-    queryKey: ["analytics", "under-running"],
-    queryFn: () => api.get("/analytics/under-running").then((res) => res.data),
+  const { data: limitData, isPending: limitPending, error: limitError } = useQuery<{
+    underRunning: Array<{ code: string; name: string; gap: number }>;
+    totalCount: number;
+  }>({
+    queryKey: ["analytics", "under-running", "10"],
+    queryFn: () => api.get("/analytics/under-running?limit=10").then((res) => res.data),
     staleTime: 5 * 60 * 1000,
   });
 
-  const { data: hoursData, isPending: hoursPending, error: hoursError } = useQuery({
+  const { data: allData, isFetching: isFetchingAll, error: allErr } = useQuery<{
+    underRunning: Array<{ code: string; name: string; gap: number }>;
+    totalCount: number;
+  }>({
+    queryKey: ["analytics", "under-running", "all"],
+    queryFn: () => api.get("/analytics/under-running").then((res) => res.data),
+    staleTime: 5 * 60 * 1000,
+    enabled: showAllUnderRunning,
+  });
+
+  const { data: hoursData, isPending: hoursPending, error: hoursError } = useQuery<{
+    avgEmptyRoomHours: number;
+  }>({
     queryKey: ["analytics", "empty-hours"],
     queryFn: () => api.get("/analytics/empty-hours").then((res) => res.data),
     staleTime: 5 * 60 * 1000,
   });
 
-  const loading = utilisationPending || probabilityPending || underRunningPending || hoursPending;
-  const error = (utilisationError || probabilityError || underRunningError || hoursError)
+  const loading = utilisationPending || probabilityPending || limitPending || hoursPending;
+  const error = (utilisationError || probabilityError || limitError || allErr || hoursError)
     ? "Could not load analytics. Connect the API to populate this dashboard."
     : null;
 
   const utilisation = utilisationData?.roomUtilisation ?? null;
   const avgEmpty = hoursData?.avgEmptyRoomHours ?? null;
-  const underRunning = underRunningData?.underRunning ?? [];
+  const underRunning = (showAllUnderRunning && allData)
+    ? allData.underRunning
+    : (limitData?.underRunning ?? []);
+  const totalCount = limitData?.totalCount ?? allData?.totalCount ?? 0;
   const emptyProb = probabilityData?.emptyProbability ?? [];
   const perRoom = utilisationData?.perRoom ?? [];
 
-  const displayedUnderRunning = showAllUnderRunning ? underRunning : underRunning.slice(0, 20);
+  const displayedUnderRunning = underRunning;
 
   return (
     <div className="space-y-6 animate-in fade-in duration-500">
@@ -121,7 +145,7 @@ function DashboardPage() {
         <MetricCard
           icon={<AlertTriangle className="h-5 w-5" />}
           label="Under-running courses"
-          value={underRunning.length.toString()}
+          value={loading ? "…" : totalCount.toString()}
           hint="Courses scheduled below their credit-implied contact hours."
         />
         <MetricCard
@@ -205,7 +229,7 @@ function DashboardPage() {
       <Card>
         <CardContent className="p-5 sm:p-6">
           <h2 className="text-base sm:text-lg font-bold text-ink mb-4">Under-running courses</h2>
-          {underRunning.length === 0 ? (
+          {totalCount === 0 ? (
             <EmptyState text="All courses are meeting their scheduled contact hours." />
           ) : (
             <>
@@ -233,15 +257,22 @@ function DashboardPage() {
                   </tbody>
                 </table>
               </div>
-              {underRunning.length > 20 && (
-                <div className="mt-4 text-center">
-                  <Button
-                    variant="ghost"
-                    onClick={() => setShowAllUnderRunning(!showAllUnderRunning)}
-                    className="text-brand-deep font-bold hover:underline py-1.5"
-                  >
-                    {showAllUnderRunning ? "Show less" : `Show all (${underRunning.length})`}
-                  </Button>
+              {totalCount > 10 && (
+                <div className="mt-4 text-center flex justify-center items-center h-9">
+                  {isFetchingAll ? (
+                    <span className="text-xs text-muted flex items-center gap-2 font-semibold">
+                      <Loader2 className="h-4 w-4 animate-spin text-brand-blue" />
+                      Loading remaining courses...
+                    </span>
+                  ) : (
+                    <Button
+                      variant="ghost"
+                      onClick={() => setShowAllUnderRunning(!showAllUnderRunning)}
+                      className="text-brand-deep font-bold hover:underline py-1.5"
+                    >
+                      {showAllUnderRunning ? "Show less" : `Show all (${totalCount})`}
+                    </Button>
+                  )}
                 </div>
               )}
             </>

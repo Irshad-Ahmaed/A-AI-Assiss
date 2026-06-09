@@ -49,13 +49,13 @@ function RoomsPage() {
     return () => clearTimeout(t);
   }, [search]);
 
-  const { data: roomsData, isPending: isLoading } = useQuery({
+  const { data: roomsData, isPending: isLoading } = useQuery<Room[]>({
     queryKey: ["rooms", debouncedSearch],
     queryFn: () => api.get(`/rooms?search=${debouncedSearch}&limit=100`).then((res) => res.data.data ?? []),
     staleTime: 5 * 60 * 1000,
   });
 
-  const { data: departmentsData } = useQuery({
+  const { data: departmentsData } = useQuery<{ id: string; name: string }[]>({
     queryKey: ["departments-list"], // Distinct query key for the dropdown data
     queryFn: () => api.get("/departments?limit=100").then((res) => res.data.data ?? []),
     staleTime: 5 * 60 * 1000,

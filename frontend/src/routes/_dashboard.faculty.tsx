@@ -49,13 +49,13 @@ function FacultyPage() {
     return () => clearTimeout(t);
   }, [search]);
 
-  const { data: facultyData, isPending: isLoading } = useQuery({
+  const { data: facultyData, isPending: isLoading } = useQuery<Faculty[]>({
     queryKey: ["faculty", debouncedSearch],
     queryFn: () => api.get(`/faculty?search=${debouncedSearch}&limit=100`).then((res) => res.data.data ?? []),
     staleTime: 5 * 60 * 1000,
   });
 
-  const { data: departmentsData } = useQuery({
+  const { data: departmentsData } = useQuery<{ id: string; name: string }[]>({
     queryKey: ["departments-list"], // Matches same list query from rooms
     queryFn: () => api.get("/departments?limit=100").then((res) => res.data.data ?? []),
     staleTime: 5 * 60 * 1000,

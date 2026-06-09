@@ -53,13 +53,13 @@ function CoursesPage() {
     return () => clearTimeout(t);
   }, [search]);
 
-  const { data: coursesData, isPending: isLoading } = useQuery({
+  const { data: coursesData, isPending: isLoading } = useQuery<Course[]>({
     queryKey: ["courses", debouncedSearch],
     queryFn: () => api.get(`/courses?search=${debouncedSearch}&limit=100`).then((res) => res.data.data ?? []),
     staleTime: 5 * 60 * 1000,
   });
 
-  const { data: branchesData } = useQuery({
+  const { data: branchesData } = useQuery<{ id: string; name: string }[]>({
     queryKey: ["branches"],
     queryFn: () => api.get("/branches").then((res) => res.data.data ?? []),
     staleTime: 5 * 60 * 1000,
@@ -99,7 +99,7 @@ function CoursesPage() {
       await api.delete(`/courses/${id}`);
       toast.success("Course deleted");
       queryClient.invalidateQueries({ queryKey: ["courses"] });
-    } catch {}
+    } catch { }
   };
 
   const handleBulkImport = async (data: any[]) => {
@@ -115,7 +115,7 @@ function CoursesPage() {
             semester: isNaN(sm) ? 1 : sm,
             branchId: row.branchId,
           });
-        } catch {}
+        } catch { }
       }
     }
     queryClient.invalidateQueries({ queryKey: ["courses"] });
@@ -184,7 +184,7 @@ function CoursesPage() {
 
           {/* Desktop table */}
           <div className="hidden sm:block rounded-xl border border-line bg-white overflow-x-auto">
-            <table className="w-full min-w-[720px] text-left text-sm text-ink-soft">
+            <table className="w-full min-w-180 text-left text-sm text-ink-soft">
               <thead className="bg-canvas-2/40 text-ink font-semibold border-b border-line">
                 <tr>
                   <th className="px-6 py-4">Code</th>

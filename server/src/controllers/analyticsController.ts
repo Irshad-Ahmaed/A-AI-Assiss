@@ -82,7 +82,7 @@ export const getUnderRunningCourses = async (req: Request, res: Response) => {
       },
     });
 
-    const underRunning = courses
+    let underRunning = courses
       .map((c) => {
         const gap = c.credits - c._count.slots;
         return {
@@ -93,8 +93,16 @@ export const getUnderRunningCourses = async (req: Request, res: Response) => {
       })
       .filter((c) => c.gap > 0);
 
+    const totalCount = underRunning.length;
+    const limit = req.query.limit ? parseInt(req.query.limit as string, 10) : undefined;
+
+    if (limit && !isNaN(limit)) {
+      underRunning = underRunning.slice(0, limit);
+    }
+
     return res.status(200).json({
       underRunning,
+      totalCount,
     });
   } catch (error) {
     console.error('Error fetching under-running courses analytics:', error);

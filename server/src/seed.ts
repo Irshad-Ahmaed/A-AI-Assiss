@@ -1,6 +1,7 @@
 import 'dotenv/config';
 import bcrypt from 'bcrypt';
 import prisma from './prisma';
+import { importPreparsedCSETimetable } from './utils/preparsedTimetable';
 
 async function seed() {
   console.log("Seeding database...");
@@ -25,6 +26,11 @@ async function seed() {
     });
 
     console.log(`Successfully seeded admin user: ${adminUser.email}`);
+
+    console.log("Importing pre-parsed CSE timetable data...");
+    const summary = await importPreparsedCSETimetable();
+    console.log("CSE Timetable data imported successfully:", JSON.stringify(summary, null, 2));
+
   } catch (error) {
     console.error("Error seeding database:", error);
   } finally {

@@ -10,6 +10,7 @@ import courseRoutes from './routes/course';
 import facultyRoutes from './routes/faculty';
 import branchRoutes from './routes/branch';
 import ingestionRoutes from './routes/ingestion';
+import analyticsRoutes from './routes/analytics';
 import './workers/ingestionQueue'; // Start the BullMQ worker
 
 dotenv.config();
@@ -18,7 +19,10 @@ const app = express();
 const PORT = process.env.PORT || 5000;
 
 // Base Middlewares
-app.use(cors());
+app.use(cors({
+  origin: ['http://localhost:5173', 'http://localhost:3000', 'http://localhost:8080'],
+  credentials: true
+}));
 app.use(express.json());
 app.use(correlationIdMiddleware);
 
@@ -31,6 +35,7 @@ app.use('/api/rooms', roomRoutes);
 app.use('/api/courses', courseRoutes);
 app.use('/api/faculty', facultyRoutes);
 app.use('/api/ingestion', ingestionRoutes);
+app.use('/api/analytics', analyticsRoutes);
 
 // Start Server
 app.listen(PORT, () => {

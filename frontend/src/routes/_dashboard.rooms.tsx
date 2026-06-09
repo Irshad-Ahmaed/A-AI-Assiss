@@ -1,6 +1,7 @@
 import * as React from "react";
 import { createFileRoute } from "@tanstack/react-router";
 import { useState, useEffect } from "react";
+import { useQuery, useQueryClient } from "@tanstack/react-query";
 import { api } from "@/lib/api";
 import { Button } from "@/components/samayak/Button";
 import { Input } from "@/components/samayak/Input";
@@ -30,11 +31,10 @@ interface Room {
 }
 
 function RoomsPage() {
-  const [rooms, setRooms] = useState<Room[]>([]);
-  const [departments, setDepartments] = useState<{ id: string; name: string }[]>([]);
-  const [isLoading, setIsLoading] = useState(true);
+  const queryClient = useQueryClient();
   const [isModalOpen, setIsModalOpen] = useState(false);
   const [search, setSearch] = useState("");
+  const [debouncedSearch, setDebouncedSearch] = useState("");
 
   const [roomNumber, setRoomNumber] = useState("");
   const [capacity, setCapacity] = useState("");
@@ -42,33 +42,33 @@ function RoomsPage() {
   const [departmentId, setDepartmentId] = useState("");
   const [isSubmitting, setIsSubmitting] = useState(false);
 
-  const fetchRooms = async () => {
-    try {
-      setIsLoading(true);
-      const res = await api.get(`/rooms?search=${search}&limit=100`);
-      setRooms(res.data.data ?? []);
-    } catch {
-      setRooms([]);
-    } finally {
-      setIsLoading(false);
-    }
-  };
-
-  const fetchDepartments = async () => {
-    try {
-      const res = await api.get("/departments?limit=100");
-      const list = res.data.data ?? [];
-      setDepartments(list);
-      if (list.length > 0) setDepartmentId(list[0].id);
-    } catch {}
-  };
-
-  useEffect(() => { fetchDepartments(); }, []);
   useEffect(() => {
-    const t = setTimeout(fetchRooms, 300);
+    const t = setTimeout(() => {
+      setDebouncedSearch(search);
+    }, 300);
     return () => clearTimeout(t);
-    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [search]);
+
+  const { data: roomsData, isPending: isLoading } = useQuery({
+    queryKey: ["rooms", debouncedSearch],
+    queryFn: () => api.get(`/rooms?search=${debouncedSearch}&limit=100`).then((res) => res.data.data ?? []),
+    staleTime: 5 * 60 * 1000,
+  });
+
+  const { data: departmentsData } = useQuery({
+    queryKey: ["departments-list"], // Distinct query key for the dropdown data
+    queryFn: () => api.get("/departments?limit=100").then((res) => res.data.data ?? []),
+    staleTime: 5 * 60 * 1000,
+  });
+
+  const rooms = roomsData ?? [];
+  const departments = departmentsData ?? [];
+
+  useEffect(() => {
+    if (departments.length > 0 && !departmentId) {
+      setDepartmentId(departments[0].id);
+    }
+  }, [departments, departmentId]);
 
   const handleCreate = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -79,7 +79,7 @@ function RoomsPage() {
       setIsModalOpen(false);
       setRoomNumber("");
       setCapacity("");
-      fetchRooms();
+      queryClient.invalidateQueries({ queryKey: ["rooms"] });
     } finally {
       setIsSubmitting(false);
     }
@@ -90,7 +90,7 @@ function RoomsPage() {
     try {
       await api.delete(`/rooms/${id}`);
       toast.success("Room deleted");
-      fetchRooms();
+      queryClient.invalidateQueries({ queryKey: ["rooms"] });
     } catch {}
   };
 
@@ -108,7 +108,7 @@ function RoomsPage() {
         } catch {}
       }
     }
-    fetchRooms();
+    queryClient.invalidateQueries({ queryKey: ["rooms"] });
   };
 
   return (

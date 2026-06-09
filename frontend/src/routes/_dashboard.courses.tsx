@@ -1,6 +1,7 @@
 import * as React from "react";
 import { createFileRoute } from "@tanstack/react-router";
 import { useState, useEffect } from "react";
+import { useQuery, useQueryClient } from "@tanstack/react-query";
 import { api } from "@/lib/api";
 import { Button } from "@/components/samayak/Button";
 import { Input } from "@/components/samayak/Input";
@@ -32,11 +33,10 @@ interface Course {
 }
 
 function CoursesPage() {
-  const [courses, setCourses] = useState<Course[]>([]);
-  const [branches, setBranches] = useState<{ id: string; name: string }[]>([]);
-  const [isLoading, setIsLoading] = useState(true);
+  const queryClient = useQueryClient();
   const [isModalOpen, setIsModalOpen] = useState(false);
   const [search, setSearch] = useState("");
+  const [debouncedSearch, setDebouncedSearch] = useState("");
 
   const [code, setCode] = useState("");
   const [name, setName] = useState("");
@@ -46,33 +46,33 @@ function CoursesPage() {
   const [branchId, setBranchId] = useState("");
   const [isSubmitting, setIsSubmitting] = useState(false);
 
-  const fetchCourses = async () => {
-    try {
-      setIsLoading(true);
-      const res = await api.get(`/courses?search=${search}&limit=100`);
-      setCourses(res.data.data ?? []);
-    } catch {
-      setCourses([]);
-    } finally {
-      setIsLoading(false);
-    }
-  };
-
-  const fetchBranches = async () => {
-    try {
-      const res = await api.get("/branches");
-      const list = res.data.data ?? [];
-      setBranches(list);
-      if (list.length > 0) setBranchId(list[0].id);
-    } catch {}
-  };
-
-  useEffect(() => { fetchBranches(); }, []);
   useEffect(() => {
-    const t = setTimeout(fetchCourses, 300);
+    const t = setTimeout(() => {
+      setDebouncedSearch(search);
+    }, 300);
     return () => clearTimeout(t);
-    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [search]);
+
+  const { data: coursesData, isPending: isLoading } = useQuery({
+    queryKey: ["courses", debouncedSearch],
+    queryFn: () => api.get(`/courses?search=${debouncedSearch}&limit=100`).then((res) => res.data.data ?? []),
+    staleTime: 5 * 60 * 1000,
+  });
+
+  const { data: branchesData } = useQuery({
+    queryKey: ["branches"],
+    queryFn: () => api.get("/branches").then((res) => res.data.data ?? []),
+    staleTime: 5 * 60 * 1000,
+  });
+
+  const courses = coursesData ?? [];
+  const branches = branchesData ?? [];
+
+  useEffect(() => {
+    if (branches.length > 0 && !branchId) {
+      setBranchId(branches[0].id);
+    }
+  }, [branches, branchId]);
 
   const handleCreate = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -87,7 +87,7 @@ function CoursesPage() {
       });
       toast.success("Course created successfully");
       setIsModalOpen(false);
-      fetchCourses();
+      queryClient.invalidateQueries({ queryKey: ["courses"] });
     } finally {
       setIsSubmitting(false);
     }
@@ -98,7 +98,7 @@ function CoursesPage() {
     try {
       await api.delete(`/courses/${id}`);
       toast.success("Course deleted");
-      fetchCourses();
+      queryClient.invalidateQueries({ queryKey: ["courses"] });
     } catch {}
   };
 
@@ -118,7 +118,7 @@ function CoursesPage() {
         } catch {}
       }
     }
-    fetchCourses();
+    queryClient.invalidateQueries({ queryKey: ["courses"] });
   };
 
   return (

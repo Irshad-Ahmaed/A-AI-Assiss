@@ -1,6 +1,7 @@
 import * as React from "react";
 import { createFileRoute } from "@tanstack/react-router";
 import { useState, useEffect } from "react";
+import { useQuery, useQueryClient } from "@tanstack/react-query";
 import { api } from "@/lib/api";
 import { Button } from "@/components/samayak/Button";
 import { Input } from "@/components/samayak/Input";
@@ -29,32 +30,29 @@ interface Department {
 }
 
 function DepartmentsPage() {
-  const [departments, setDepartments] = useState<Department[]>([]);
-  const [isLoading, setIsLoading] = useState(true);
+  const queryClient = useQueryClient();
   const [isModalOpen, setIsModalOpen] = useState(false);
   const [search, setSearch] = useState("");
+  const [debouncedSearch, setDebouncedSearch] = useState("");
 
   const [name, setName] = useState("");
   const [shortCode, setShortCode] = useState("");
   const [isSubmitting, setIsSubmitting] = useState(false);
 
-  const fetchDepartments = async () => {
-    try {
-      setIsLoading(true);
-      const res = await api.get(`/departments?search=${search}&limit=100`);
-      setDepartments(res.data.data ?? []);
-    } catch {
-      setDepartments([]);
-    } finally {
-      setIsLoading(false);
-    }
-  };
-
   useEffect(() => {
-    const t = setTimeout(fetchDepartments, 300);
+    const t = setTimeout(() => {
+      setDebouncedSearch(search);
+    }, 300);
     return () => clearTimeout(t);
-    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [search]);
+
+  const { data: departmentsData, isPending: isLoading } = useQuery({
+    queryKey: ["departments", debouncedSearch],
+    queryFn: () => api.get(`/departments?search=${debouncedSearch}&limit=100`).then((res) => res.data.data ?? []),
+    staleTime: 5 * 60 * 1000,
+  });
+
+  const departments = departmentsData ?? [];
 
   const handleCreate = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -65,7 +63,7 @@ function DepartmentsPage() {
       setIsModalOpen(false);
       setName("");
       setShortCode("");
-      fetchDepartments();
+      queryClient.invalidateQueries({ queryKey: ["departments"] });
     } finally {
       setIsSubmitting(false);
     }
@@ -76,7 +74,7 @@ function DepartmentsPage() {
     try {
       await api.delete(`/departments/${id}`);
       toast.success("Department deleted");
-      fetchDepartments();
+      queryClient.invalidateQueries({ queryKey: ["departments"] });
     } catch {}
   };
 
@@ -88,7 +86,7 @@ function DepartmentsPage() {
         } catch {}
       }
     }
-    fetchDepartments();
+    queryClient.invalidateQueries({ queryKey: ["departments"] });
   };
 
   return (

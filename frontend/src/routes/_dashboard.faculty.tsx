@@ -1,6 +1,7 @@
 import * as React from "react";
 import { createFileRoute } from "@tanstack/react-router";
 import { useState, useEffect } from "react";
+import { useQuery, useQueryClient } from "@tanstack/react-query";
 import { api } from "@/lib/api";
 import { Button } from "@/components/samayak/Button";
 import { Input } from "@/components/samayak/Input";
@@ -30,11 +31,10 @@ interface Faculty {
 }
 
 function FacultyPage() {
-  const [facultyList, setFacultyList] = useState<Faculty[]>([]);
-  const [departments, setDepartments] = useState<{ id: string; name: string }[]>([]);
-  const [isLoading, setIsLoading] = useState(true);
+  const queryClient = useQueryClient();
   const [isModalOpen, setIsModalOpen] = useState(false);
   const [search, setSearch] = useState("");
+  const [debouncedSearch, setDebouncedSearch] = useState("");
 
   const [name, setName] = useState("");
   const [email, setEmail] = useState("");
@@ -42,33 +42,33 @@ function FacultyPage() {
   const [departmentId, setDepartmentId] = useState("");
   const [isSubmitting, setIsSubmitting] = useState(false);
 
-  const fetchFaculty = async () => {
-    try {
-      setIsLoading(true);
-      const res = await api.get(`/faculty?search=${search}&limit=100`);
-      setFacultyList(res.data.data ?? []);
-    } catch {
-      setFacultyList([]);
-    } finally {
-      setIsLoading(false);
-    }
-  };
-
-  const fetchDepartments = async () => {
-    try {
-      const res = await api.get("/departments?limit=100");
-      const list = res.data.data ?? [];
-      setDepartments(list);
-      if (list.length > 0) setDepartmentId(list[0].id);
-    } catch { }
-  };
-
-  useEffect(() => { fetchDepartments(); }, []);
   useEffect(() => {
-    const t = setTimeout(fetchFaculty, 300);
+    const t = setTimeout(() => {
+      setDebouncedSearch(search);
+    }, 300);
     return () => clearTimeout(t);
-    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [search]);
+
+  const { data: facultyData, isPending: isLoading } = useQuery({
+    queryKey: ["faculty", debouncedSearch],
+    queryFn: () => api.get(`/faculty?search=${debouncedSearch}&limit=100`).then((res) => res.data.data ?? []),
+    staleTime: 5 * 60 * 1000,
+  });
+
+  const { data: departmentsData } = useQuery({
+    queryKey: ["departments-list"], // Matches same list query from rooms
+    queryFn: () => api.get("/departments?limit=100").then((res) => res.data.data ?? []),
+    staleTime: 5 * 60 * 1000,
+  });
+
+  const facultyList = facultyData ?? [];
+  const departments = departmentsData ?? [];
+
+  useEffect(() => {
+    if (departments.length > 0 && !departmentId) {
+      setDepartmentId(departments[0].id);
+    }
+  }, [departments, departmentId]);
 
   const handleCreate = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -78,7 +78,7 @@ function FacultyPage() {
       toast.success("Faculty added");
       setIsModalOpen(false);
       setName(""); setEmail(""); setPassword("");
-      fetchFaculty();
+      queryClient.invalidateQueries({ queryKey: ["faculty"] });
     } finally {
       setIsSubmitting(false);
     }
@@ -89,7 +89,7 @@ function FacultyPage() {
     try {
       await api.delete(`/faculty/${id}`);
       toast.success("Faculty removed");
-      fetchFaculty();
+      queryClient.invalidateQueries({ queryKey: ["faculty"] });
     } catch { }
   };
 
@@ -104,7 +104,7 @@ function FacultyPage() {
         } catch { }
       }
     }
-    fetchFaculty();
+    queryClient.invalidateQueries({ queryKey: ["faculty"] });
   };
 
   const roleBadge = (role: string) => {

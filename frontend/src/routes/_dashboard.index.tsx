@@ -1,6 +1,7 @@
 import * as React from "react";
 import { createFileRoute } from "@tanstack/react-router";
-import { useEffect, useState } from "react";
+import { useState } from "react";
+import { useQuery } from "@tanstack/react-query";
 import { api } from "@/lib/api";
 import { Card, CardContent } from "@/components/samayak/Card";
 import { Button } from "@/components/samayak/Button";
@@ -44,95 +45,42 @@ interface Analytics {
 }
 
 function DashboardPage() {
-  const [data, setData] = useState<Analytics | null>(null);
-  const [loading, setLoading] = useState(true);
-  const [error, setError] = useState<string | null>(null);
   const [showAllUnderRunning, setShowAllUnderRunning] = useState(false);
 
-  useEffect(() => {
-    let cancelled = false;
-    setLoading(true);
-    let loadedCount = 0;
-    const totalRequests = 4;
+  const { data: utilisationData, isPending: utilisationPending, error: utilisationError } = useQuery({
+    queryKey: ["analytics", "utilisation"],
+    queryFn: () => api.get("/analytics/utilisation").then((res) => res.data),
+    staleTime: 5 * 60 * 1000,
+  });
 
-    const handleResolve = () => {
-      loadedCount++;
-      if (loadedCount === totalRequests && !cancelled) {
-        setLoading(false);
-      }
-    };
+  const { data: probabilityData, isPending: probabilityPending, error: probabilityError } = useQuery({
+    queryKey: ["analytics", "empty-probability"],
+    queryFn: () => api.get("/analytics/empty-probability").then((res) => res.data),
+    staleTime: 5 * 60 * 1000,
+  });
 
-    // 1. Fetch Utilisation
-    api.get("/analytics/utilisation")
-      .then((res) => {
-        if (!cancelled) {
-          setData((prev) => ({
-            ...prev,
-            roomUtilisation: res.data.roomUtilisation,
-            perRoom: res.data.perRoom,
-          }));
-        }
-      })
-      .catch(() => {
-        if (!cancelled) setError("Could not load analytics. Connect the API to populate this dashboard.");
-      })
-      .finally(handleResolve);
+  const { data: underRunningData, isPending: underRunningPending, error: underRunningError } = useQuery({
+    queryKey: ["analytics", "under-running"],
+    queryFn: () => api.get("/analytics/under-running").then((res) => res.data),
+    staleTime: 5 * 60 * 1000,
+  });
 
-    // 2. Fetch Empty Probability
-    api.get("/analytics/empty-probability")
-      .then((res) => {
-        if (!cancelled) {
-          setData((prev) => ({
-            ...prev,
-            emptyProbability: res.data.emptyProbability,
-          }));
-        }
-      })
-      .catch(() => {
-        if (!cancelled) setError("Could not load analytics. Connect the API to populate this dashboard.");
-      })
-      .finally(handleResolve);
+  const { data: hoursData, isPending: hoursPending, error: hoursError } = useQuery({
+    queryKey: ["analytics", "empty-hours"],
+    queryFn: () => api.get("/analytics/empty-hours").then((res) => res.data),
+    staleTime: 5 * 60 * 1000,
+  });
 
-    // 3. Fetch Under Running Courses
-    api.get("/analytics/under-running")
-      .then((res) => {
-        if (!cancelled) {
-          setData((prev) => ({
-            ...prev,
-            underRunning: res.data.underRunning,
-          }));
-        }
-      })
-      .catch(() => {
-        if (!cancelled) setError("Could not load analytics. Connect the API to populate this dashboard.");
-      })
-      .finally(handleResolve);
+  const loading = utilisationPending || probabilityPending || underRunningPending || hoursPending;
+  const error = (utilisationError || probabilityError || underRunningError || hoursError)
+    ? "Could not load analytics. Connect the API to populate this dashboard."
+    : null;
 
-    // 4. Fetch Empty Hours
-    api.get("/analytics/empty-hours")
-      .then((res) => {
-        if (!cancelled) {
-          setData((prev) => ({
-            ...prev,
-            avgEmptyRoomHours: res.data.avgEmptyRoomHours,
-          }));
-        }
-      })
-      .catch(() => {
-        if (!cancelled) setError("Could not load analytics. Connect the API to populate this dashboard.");
-      })
-      .finally(handleResolve);
-
-    return () => {
-      cancelled = true;
-    };
-  }, []);
-
-  const utilisation = data?.roomUtilisation ?? null;
-  const avgEmpty = data?.avgEmptyRoomHours ?? null;
-  const underRunning = data?.underRunning ?? [];
-  const emptyProb = data?.emptyProbability ?? [];
-  const perRoom = data?.perRoom ?? [];
+  const utilisation = utilisationData?.roomUtilisation ?? null;
+  const avgEmpty = hoursData?.avgEmptyRoomHours ?? null;
+  const underRunning = underRunningData?.underRunning ?? [];
+  const emptyProb = probabilityData?.emptyProbability ?? [];
+  const perRoom = utilisationData?.perRoom ?? [];
 
   const displayedUnderRunning = showAllUnderRunning ? underRunning : underRunning.slice(0, 20);
 

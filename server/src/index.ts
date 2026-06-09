@@ -19,8 +19,27 @@ const app = express();
 const PORT = process.env.PORT || 5000;
 
 // Base Middlewares
+const allowedOrigins = [
+  'http://localhost:5173',
+  'http://localhost:3000',
+  'http://localhost:8080'
+];
+if (process.env.CORS_ORIGIN) {
+  if (process.env.CORS_ORIGIN === '*') {
+    allowedOrigins.push('*');
+  } else {
+    allowedOrigins.push(...process.env.CORS_ORIGIN.split(',').map(o => o.trim()));
+  }
+}
+
 app.use(cors({
-  origin: ['http://localhost:5173', 'http://localhost:3000', 'http://localhost:8080'],
+  origin: (origin, callback) => {
+    if (!origin || allowedOrigins.includes('*') || allowedOrigins.indexOf(origin) !== -1) {
+      callback(null, true);
+    } else {
+      callback(new Error('Not allowed by CORS'));
+    }
+  },
   credentials: true
 }));
 app.use(express.json());

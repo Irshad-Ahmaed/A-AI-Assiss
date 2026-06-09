@@ -60,7 +60,7 @@ function FacultyPage() {
       const list = res.data.data ?? [];
       setDepartments(list);
       if (list.length > 0) setDepartmentId(list[0].id);
-    } catch {}
+    } catch { }
   };
 
   useEffect(() => { fetchDepartments(); }, []);
@@ -90,7 +90,7 @@ function FacultyPage() {
       await api.delete(`/faculty/${id}`);
       toast.success("Faculty removed");
       fetchFaculty();
-    } catch {}
+    } catch { }
   };
 
   const handleBulkImport = async (data: any[]) => {
@@ -101,7 +101,7 @@ function FacultyPage() {
             name: row.name, email: row.email,
             password: row.password, departmentId: row.departmentId,
           });
-        } catch {}
+        } catch { }
       }
     }
     fetchFaculty();
@@ -183,7 +183,7 @@ function FacultyPage() {
 
           {/* Desktop table */}
           <div className="hidden sm:block rounded-xl border border-line bg-white overflow-x-auto">
-            <table className="w-full min-w-[720px] text-left text-sm text-ink-soft">
+            <table className="w-full min-w-180 text-left text-sm text-ink-soft">
               <thead className="bg-canvas-2/40 text-ink font-semibold border-b border-line">
                 <tr>
                   <th className="px-6 py-4">Name</th>

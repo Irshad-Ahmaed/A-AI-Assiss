@@ -3,7 +3,7 @@ import { ingestionQueue, INGESTION_QUEUE_NAME } from '../workers/ingestionQueue'
 import { QueueEvents } from 'bullmq';
 import { redisConnection } from '../utils/redis';
 
-const queueEvents = new QueueEvents(INGESTION_QUEUE_NAME, { connection: redisConnection });
+const queueEvents = new QueueEvents(INGESTION_QUEUE_NAME, { connection: redisConnection as any });
 
 export const startIngestion = async (req: Request, res: Response) => {
   try {
@@ -29,7 +29,7 @@ export const startIngestion = async (req: Request, res: Response) => {
 export const getIngestionStatus = async (req: Request, res: Response) => {
   try {
     const { id } = req.params;
-    const job = await ingestionQueue.getJob(id);
+    const job = await ingestionQueue.getJob(id as string);
 
     if (!job) {
       return res.status(404).json({ error: 'Job not found' });
@@ -37,15 +37,16 @@ export const getIngestionStatus = async (req: Request, res: Response) => {
 
     const state = await job.getState();
     const progress = job.progress;
+    const progressObj = progress as any;
 
     let status = 'queued';
     let summary = null;
 
     if (state === 'active') {
-      status = typeof progress === 'object' && progress.status ? progress.status : 'parsing';
+      status = progressObj && progressObj.status ? progressObj.status : 'parsing';
     } else if (state === 'completed') {
       status = 'done';
-      summary = job.returnvalue?.summary || (typeof progress === 'object' ? progress.summary : null);
+      summary = job.returnvalue?.summary || (progressObj ? progressObj.summary : null);
     } else if (state === 'failed') {
       status = 'error';
     } else if (state === 'delayed' || state === 'waiting') {
